@@ -29,7 +29,7 @@ load("hoc_speeches.Rdata")
  
  (a) Inspect the `data.frame` object `speeches` and produce some summary statistics.
  (b) Use the functions in the `quanteda` package to turn this data into a `corpus` object. Attach the relevant metadata as `docvars`.
- (c) Turn this corpus into a document-feature matrix (remove all punctuation with `remove_punct = T` and all numbers with `remove_numbers = T`). You will need to do some pre-processing if you don't want to wait days for your topic model to coverge. Think about some of the following:
+ (c) Turn this corpus into a document-feature matrix. You will need to do some pre-processing if you don't want to wait days for your topic model to coverge. Think about some of the following:
  
     (i) Unigrams? 
     (ii) Stopwords?
@@ -50,13 +50,13 @@ load("hoc_speeches.Rdata")
 
     (v) Find the top three documents associated with each topic. Do these make sense given the words you have used to describe that topic? (Hint: in the estimated `stm` object, the document-topic probabilities are stored in `theta`) Report the top speeches for one selected topic.
 
-    (vi) Use the `estimateEffect` functions in the `stm` package to estimate the effect of MP gender on topic usage. Call `plot` on the returned object to establish on which topics women are, on average, more active? 
+    (vi) Use the `estimateEffect` and `plot.estimateEffect` functions in the `stm` package to estimate the effect of MP gender on topic usage. On which topics are women, on average, more active? 
 
 (If you get stuck on this question, there is some example code in Jack's lecture notes. Also, the `stm` documentation is very good!)
 
 ## Topic modelling of movie reviews
 
-**movies corpus**.  Here we will use the very impressive `LDAvis` library in conjunction with the `lda.collapsed.gibbs.sampler()` function from the `lda` package. The following code is used to demonstate how the parliamentary speeches interactive visualisation example was created for in the lecture. Your task is to implement this for the `movies` corpus.
+**movies corpus**.  Here we will use the very impressive `LDAvis` library in conjunction with the `lda::lda.collapsed.gibbs.sampler()` function from the `lda` package. The following code is used to demonstate how the parliamentary speeches interactive visualisation example was created for in the lecture. Your task is to implement this for the `movies` corpus.
 
 First we construct the relevant `dfm` and estimate the `lda` model.
 ```{r, eval=FALSE}
@@ -64,17 +64,17 @@ First we construct the relevant `dfm` and estimate the `lda` model.
 speechCorpus <- corpus(speeches$Speech)
 
 ## Convert to dfm, removing some words that appear very regularly
-speechDfm <- dfm(speechCorpus, remove = c(stopwords("SMART"),stopwords("english"), "will", "hon", "right","people","government","can","friend","house","gentleman","said", "interruption", "prime", "minister", "secretary", "state"), stem = F, remove_punct = T)
+speechDfm <- dfm(speechCorpus, ignoredFeatures = c(stopwords("SMART"),stopwords("english"), "will", "hon", "right","people","government","can","friend","house","gentleman","said", "interruption", "prime", "minister", "secretary", "state"), stem = F)
 
 ## Trim some rarely occuring words
-speechDfm <- dfm_trim(speechDfm, min_count = 15, min_docfreq = .0015)
+speechDfm <- trim(speechDfm, minCount = 15, minDoc = .0015)
 
 # Convert to lda format
 speechDfmlda <- convert(speechDfm, to = "lda")
 
 # MCMC and model tuning parameters:
 K <- 30 # Number of topics
-G <- 1000 # Number of iterations (You could reduce this to a small number for testing)
+G <- 2000 # Number of iterations
 alpha <- 0.02 # Prior for topic proportions
 eta <- 0.02 # Prior for topic distributions
 
@@ -87,7 +87,7 @@ fit <- lda.collapsed.gibbs.sampler(documents = speechDfmlda$documents, K = K,
                                      eta = eta, initial = NULL, burnin = 0,
                                       compute.log.likelihood = TRUE)
         t2 <- Sys.time() # End timer
-        t2 - t1  # about 7 minutes on Jack's MacBook Pro
+        t2 - t1  # about 15 minutes on Jack's MacBook Pro
 ```
 
 Now we plot the model using `LDAvis`.
@@ -98,15 +98,16 @@ library(LDAvis)
 json <- createJSON(phi = t(apply(t(fit$topics) + eta, 2, function(x) x/sum(x))), 
                    theta = t(apply(fit$document_sums + alpha, 2, function(x) x/sum(x))), 
                    doc.length = ntoken(speechDfm), 
-                   vocab = featnames(speechDfm), 
+                   vocab = features(speechDfm), 
                    term.frequency = colSums(speechDfm))
         serVis(json, out.dir = "exampleVis", open.browser = TRUE)
 ```
 
-  a.  You will need to load the data from the `quanteda.corpora` package that we installed previously: 
+  a.  You will need to load the data from the `quanteda.corpora` package which is hosted on GitHub: 
     
 ```{r}
-library(quanteda.corpora)
+library(devtools)
+  #install_github("quanteda/quanteda.corpora") # Only run this line if you didn't already install this yesterday!
 data(data_corpus_movies, package = "quanteda.corpora")
 ```
     

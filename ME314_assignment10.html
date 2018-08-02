@@ -142,7 +142,7 @@ set.seed(221186)</code></pre>
 <ol style="list-style-type: lower-alpha">
 <li>Inspect the <code>data.frame</code> object <code>speeches</code> and produce some summary statistics.</li>
 <li>Use the functions in the <code>quanteda</code> package to turn this data into a <code>corpus</code> object. Attach the relevant metadata as <code>docvars</code>.</li>
-<li><p>Turn this corpus into a document-feature matrix (remove all punctuation with <code>remove_punct = T</code> and all numbers with <code>remove_numbers = T</code>). You will need to do some pre-processing if you don’t want to wait days for your topic model to coverge. Think about some of the following:</p>
+<li><p>Turn this corpus into a document-feature matrix. You will need to do some pre-processing if you don’t want to wait days for your topic model to coverge. Think about some of the following:</p>
 <ol style="list-style-type: lower-roman">
 <li>Unigrams?</li>
 <li>Stopwords?</li>
@@ -159,30 +159,30 @@ set.seed(221186)</code></pre>
 <li><p>Use the <code>plot</code> function on your estimated <code>stm</code> object to see the top topic words with their corpus frequency</p></li>
 <li><p>Examine the top words from each topic using <code>labelTopics</code></p></li>
 <li><p>Find the top three documents associated with each topic. Do these make sense given the words you have used to describe that topic? (Hint: in the estimated <code>stm</code> object, the document-topic probabilities are stored in <code>theta</code>) Report the top speeches for one selected topic.</p></li>
-<li><p>Use the <code>estimateEffect</code> functions in the <code>stm</code> package to estimate the effect of MP gender on topic usage. Call <code>plot</code> on the returned object to establish on which topics women are, on average, more active?</p></li>
+<li><p>Use the <code>estimateEffect</code> and <code>plot.estimateEffect</code> functions in the <code>stm</code> package to estimate the effect of MP gender on topic usage. On which topics are women, on average, more active?</p></li>
 </ol></li>
 </ol>
 <p>(If you get stuck on this question, there is some example code in Jack’s lecture notes. Also, the <code>stm</code> documentation is very good!)</p>
 </div>
 <div id="topic-modelling-of-movie-reviews" class="section level2">
 <h2>Topic modelling of movie reviews</h2>
-<p><strong>movies corpus</strong>. Here we will use the very impressive <code>LDAvis</code> library in conjunction with the <code>lda.collapsed.gibbs.sampler()</code> function from the <code>lda</code> package. The following code is used to demonstate how the parliamentary speeches interactive visualisation example was created for in the lecture. Your task is to implement this for the <code>movies</code> corpus.</p>
+<p><strong>movies corpus</strong>. Here we will use the very impressive <code>LDAvis</code> library in conjunction with the <code>lda::lda.collapsed.gibbs.sampler()</code> function from the <code>lda</code> package. The following code is used to demonstate how the parliamentary speeches interactive visualisation example was created for in the lecture. Your task is to implement this for the <code>movies</code> corpus.</p>
 <p>First we construct the relevant <code>dfm</code> and estimate the <code>lda</code> model.</p>
 <pre class="r"><code>## Create a corpus of speeches
 speechCorpus &lt;- corpus(speeches$Speech)
 
 ## Convert to dfm, removing some words that appear very regularly
-speechDfm &lt;- dfm(speechCorpus, remove = c(stopwords(&quot;SMART&quot;),stopwords(&quot;english&quot;), &quot;will&quot;, &quot;hon&quot;, &quot;right&quot;,&quot;people&quot;,&quot;government&quot;,&quot;can&quot;,&quot;friend&quot;,&quot;house&quot;,&quot;gentleman&quot;,&quot;said&quot;, &quot;interruption&quot;, &quot;prime&quot;, &quot;minister&quot;, &quot;secretary&quot;, &quot;state&quot;), stem = F, remove_punct = T)
+speechDfm &lt;- dfm(speechCorpus, ignoredFeatures = c(stopwords(&quot;SMART&quot;),stopwords(&quot;english&quot;), &quot;will&quot;, &quot;hon&quot;, &quot;right&quot;,&quot;people&quot;,&quot;government&quot;,&quot;can&quot;,&quot;friend&quot;,&quot;house&quot;,&quot;gentleman&quot;,&quot;said&quot;, &quot;interruption&quot;, &quot;prime&quot;, &quot;minister&quot;, &quot;secretary&quot;, &quot;state&quot;), stem = F)
 
 ## Trim some rarely occuring words
-speechDfm &lt;- dfm_trim(speechDfm, min_count = 15, min_docfreq = .0015)
+speechDfm &lt;- trim(speechDfm, minCount = 15, minDoc = .0015)
 
 # Convert to lda format
 speechDfmlda &lt;- convert(speechDfm, to = &quot;lda&quot;)
 
 # MCMC and model tuning parameters:
 K &lt;- 30 # Number of topics
-G &lt;- 1000 # Number of iterations (You could reduce this to a small number for testing)
+G &lt;- 2000 # Number of iterations
 alpha &lt;- 0.02 # Prior for topic proportions
 eta &lt;- 0.02 # Prior for topic distributions
 
@@ -195,20 +195,21 @@ fit &lt;- lda.collapsed.gibbs.sampler(documents = speechDfmlda$documents, K = K,
                                      eta = eta, initial = NULL, burnin = 0,
                                       compute.log.likelihood = TRUE)
         t2 &lt;- Sys.time() # End timer
-        t2 - t1  # about 7 minutes on Jack's MacBook Pro</code></pre>
+        t2 - t1  # about 15 minutes on Jack's MacBook Pro</code></pre>
 <p>Now we plot the model using <code>LDAvis</code>.</p>
 <pre class="r"><code>library(LDAvis)
 # create the JSON object to feed the visualization:
 json &lt;- createJSON(phi = t(apply(t(fit$topics) + eta, 2, function(x) x/sum(x))), 
                    theta = t(apply(fit$document_sums + alpha, 2, function(x) x/sum(x))), 
                    doc.length = ntoken(speechDfm), 
-                   vocab = featnames(speechDfm), 
+                   vocab = features(speechDfm), 
                    term.frequency = colSums(speechDfm))
         serVis(json, out.dir = &quot;exampleVis&quot;, open.browser = TRUE)</code></pre>
 <ol style="list-style-type: lower-alpha">
-<li>You will need to load the data from the <code>quanteda.corpora</code> package that we installed previously:</li>
+<li>You will need to load the data from the <code>quanteda.corpora</code> package which is hosted on GitHub:</li>
 </ol>
-<pre class="r"><code>library(quanteda.corpora)
+<pre class="r"><code>library(devtools)
+  #install_github(&quot;quanteda/quanteda.corpora&quot;) # Only run this line if you didn't already install this yesterday!
 data(data_corpus_movies, package = &quot;quanteda.corpora&quot;)</code></pre>
 <ol start="2" style="list-style-type: lower-alpha">
 <li><p>Adapt the code above to produce an interactive visualisation of the <code>movies</code> corpus.</p></li>

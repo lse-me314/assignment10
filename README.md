@@ -4,7 +4,7 @@ You should clone this repository to get started with this lab.  The URL to clone
 
 ### Assignment
 
-Work with the file [ME314-assignment10-LASTNAME-FIRSTNAME.Rmd](ME314-assignment10-LASTNAME-FIRSTNAME.Rmd).
+Work with the file [ME314_assignment10.Rmd](ME314_assignment10.Rmd).
 
 <!--
 ### Solutions
