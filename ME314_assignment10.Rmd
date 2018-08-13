@@ -8,6 +8,7 @@ You will need to load the following libraries (you may also want to set the rand
 ```{r, eval=T, message = F}
 library(quanteda)
 library(topicmodels)
+library(lda)
 library(LDAvis)
 library(stm)
 library(knitr)
@@ -59,15 +60,15 @@ load("hoc_speeches.Rdata")
 **movies corpus**.  Here we will use the very impressive `LDAvis` library in conjunction with the `lda::lda.collapsed.gibbs.sampler()` function from the `lda` package. The following code is used to demonstate how the parliamentary speeches interactive visualisation example was created for in the lecture. Your task is to implement this for the `movies` corpus.
 
 First we construct the relevant `dfm` and estimate the `lda` model.
-```{r, eval=FALSE}
+```{r, eval=TRUE}
 ## Create a corpus of speeches
-speechCorpus <- corpus(speeches$Speech)
+speechCorpus <- corpus(speeches$speech)
 
 ## Convert to dfm, removing some words that appear very regularly
-speechDfm <- dfm(speechCorpus, ignoredFeatures = c(stopwords("SMART"),stopwords("english"), "will", "hon", "right","people","government","can","friend","house","gentleman","said", "interruption", "prime", "minister", "secretary", "state"), stem = F)
+speechDfm <- dfm(speechCorpus, remove = c(stopwords(source = "smart"),stopwords("english"), "will", "hon", "right","people","government","can","friend","house","gentleman","said", "interruption", "prime", "minister", "secretary", "state"), stem = F)
 
 ## Trim some rarely occuring words
-speechDfm <- trim(speechDfm, minCount = 15, minDoc = .0015)
+speechDfm <- dfm_trim(speechDfm, min_termfreq = 15, minDoc = .0015 * ndoc(speechDfm))
 
 # Convert to lda format
 speechDfmlda <- convert(speechDfm, to = "lda")
@@ -78,16 +79,22 @@ G <- 2000 # Number of iterations
 alpha <- 0.02 # Prior for topic proportions
 eta <- 0.02 # Prior for topic distributions
 
-# Fit the model
-t1 <- Sys.time() # Start timer
+# # Don't run!
+# # Fit the model
+# t1 <- Sys.time() # Start timer
+# 
+# fit <- lda.collapsed.gibbs.sampler(documents = speechDfmlda$documents, K = K,
+#                                        vocab = speechDfmlda$vocab,
+#                                       num.iterations = G, alpha = alpha,
+#                                      eta = eta, initial = NULL, burnin = 0,
+#                                       compute.log.likelihood = TRUE)
+# t2 <- Sys.time() # End timer
+# 
+# t2 - t1  # about 15 minutes on Jack's MacBook Pro
+# save(fit, file = "fitted_lda.rda")
 
-fit <- lda.collapsed.gibbs.sampler(documents = speechDfmlda$documents, K = K, 
-                                       vocab = speechDfmlda$vocab, 
-                                      num.iterations = G, alpha = alpha, 
-                                     eta = eta, initial = NULL, burnin = 0,
-                                      compute.log.likelihood = TRUE)
-        t2 <- Sys.time() # End timer
-        t2 - t1  # about 15 minutes on Jack's MacBook Pro
+load("fitted_lda.rda")
+
 ```
 
 Now we plot the model using `LDAvis`.
@@ -98,16 +105,16 @@ library(LDAvis)
 json <- createJSON(phi = t(apply(t(fit$topics) + eta, 2, function(x) x/sum(x))), 
                    theta = t(apply(fit$document_sums + alpha, 2, function(x) x/sum(x))), 
                    doc.length = ntoken(speechDfm), 
-                   vocab = features(speechDfm), 
+                   vocab = colnames(speechDfm), 
                    term.frequency = colSums(speechDfm))
-        serVis(json, out.dir = "exampleVis", open.browser = TRUE)
+serVis(json, out.dir = "exampleVis", open.browser = TRUE)
 ```
 
   a.  You will need to load the data from the `quanteda.corpora` package which is hosted on GitHub: 
     
 ```{r}
 library(devtools)
-  #install_github("quanteda/quanteda.corpora") # Only run this line if you didn't already install this yesterday!
+#install_github("quanteda/quanteda.corpora") # Only run this line if you didn't already install this yesterday!
 data(data_corpus_movies, package = "quanteda.corpora")
 ```
     

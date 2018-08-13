@@ -130,6 +130,7 @@ $(document).ready(function () {
 <p>You will need to load the following libraries (you may also want to set the random number seed to make everything replicable):</p>
 <pre class="r"><code>library(quanteda)
 library(topicmodels)
+library(lda)
 library(LDAvis)
 library(stm)
 library(knitr)
@@ -169,13 +170,13 @@ set.seed(221186)</code></pre>
 <p><strong>movies corpus</strong>. Here we will use the very impressive <code>LDAvis</code> library in conjunction with the <code>lda::lda.collapsed.gibbs.sampler()</code> function from the <code>lda</code> package. The following code is used to demonstate how the parliamentary speeches interactive visualisation example was created for in the lecture. Your task is to implement this for the <code>movies</code> corpus.</p>
 <p>First we construct the relevant <code>dfm</code> and estimate the <code>lda</code> model.</p>
 <pre class="r"><code>## Create a corpus of speeches
-speechCorpus &lt;- corpus(speeches$Speech)
+speechCorpus &lt;- corpus(speeches$speech)
 
 ## Convert to dfm, removing some words that appear very regularly
-speechDfm &lt;- dfm(speechCorpus, ignoredFeatures = c(stopwords(&quot;SMART&quot;),stopwords(&quot;english&quot;), &quot;will&quot;, &quot;hon&quot;, &quot;right&quot;,&quot;people&quot;,&quot;government&quot;,&quot;can&quot;,&quot;friend&quot;,&quot;house&quot;,&quot;gentleman&quot;,&quot;said&quot;, &quot;interruption&quot;, &quot;prime&quot;, &quot;minister&quot;, &quot;secretary&quot;, &quot;state&quot;), stem = F)
+speechDfm &lt;- dfm(speechCorpus, remove = c(stopwords(source = &quot;smart&quot;),stopwords(&quot;english&quot;), &quot;will&quot;, &quot;hon&quot;, &quot;right&quot;,&quot;people&quot;,&quot;government&quot;,&quot;can&quot;,&quot;friend&quot;,&quot;house&quot;,&quot;gentleman&quot;,&quot;said&quot;, &quot;interruption&quot;, &quot;prime&quot;, &quot;minister&quot;, &quot;secretary&quot;, &quot;state&quot;), stem = F)
 
 ## Trim some rarely occuring words
-speechDfm &lt;- trim(speechDfm, minCount = 15, minDoc = .0015)
+speechDfm &lt;- dfm_trim(speechDfm, min_termfreq = 15, minDoc = .0015 * ndoc(speechDfm))
 
 # Convert to lda format
 speechDfmlda &lt;- convert(speechDfm, to = &quot;lda&quot;)
@@ -186,30 +187,35 @@ G &lt;- 2000 # Number of iterations
 alpha &lt;- 0.02 # Prior for topic proportions
 eta &lt;- 0.02 # Prior for topic distributions
 
-# Fit the model
-t1 &lt;- Sys.time() # Start timer
+# # Don't run!
+# # Fit the model
+# t1 &lt;- Sys.time() # Start timer
+# 
+# fit &lt;- lda.collapsed.gibbs.sampler(documents = speechDfmlda$documents, K = K,
+#                                        vocab = speechDfmlda$vocab,
+#                                       num.iterations = G, alpha = alpha,
+#                                      eta = eta, initial = NULL, burnin = 0,
+#                                       compute.log.likelihood = TRUE)
+# t2 &lt;- Sys.time() # End timer
+# 
+# t2 - t1  # about 15 minutes on Jack's MacBook Pro
+# save(fit, file = &quot;fitted_lda.rda&quot;)
 
-fit &lt;- lda.collapsed.gibbs.sampler(documents = speechDfmlda$documents, K = K, 
-                                       vocab = speechDfmlda$vocab, 
-                                      num.iterations = G, alpha = alpha, 
-                                     eta = eta, initial = NULL, burnin = 0,
-                                      compute.log.likelihood = TRUE)
-        t2 &lt;- Sys.time() # End timer
-        t2 - t1  # about 15 minutes on Jack's MacBook Pro</code></pre>
+load(&quot;fitted_lda.rda&quot;)</code></pre>
 <p>Now we plot the model using <code>LDAvis</code>.</p>
 <pre class="r"><code>library(LDAvis)
 # create the JSON object to feed the visualization:
 json &lt;- createJSON(phi = t(apply(t(fit$topics) + eta, 2, function(x) x/sum(x))), 
                    theta = t(apply(fit$document_sums + alpha, 2, function(x) x/sum(x))), 
                    doc.length = ntoken(speechDfm), 
-                   vocab = features(speechDfm), 
+                   vocab = colnames(speechDfm), 
                    term.frequency = colSums(speechDfm))
-        serVis(json, out.dir = &quot;exampleVis&quot;, open.browser = TRUE)</code></pre>
+serVis(json, out.dir = &quot;exampleVis&quot;, open.browser = TRUE)</code></pre>
 <ol style="list-style-type: lower-alpha">
 <li>You will need to load the data from the <code>quanteda.corpora</code> package which is hosted on GitHub:</li>
 </ol>
 <pre class="r"><code>library(devtools)
-  #install_github(&quot;quanteda/quanteda.corpora&quot;) # Only run this line if you didn't already install this yesterday!
+#install_github(&quot;quanteda/quanteda.corpora&quot;) # Only run this line if you didn't already install this yesterday!
 data(data_corpus_movies, package = &quot;quanteda.corpora&quot;)</code></pre>
 <ol start="2" style="list-style-type: lower-alpha">
 <li><p>Adapt the code above to produce an interactive visualisation of the <code>movies</code> corpus.</p></li>
