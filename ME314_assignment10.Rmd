@@ -39,11 +39,9 @@ load("hoc_speeches.Rdata")
     
 (If you get stuck, refer to yesterday's problem set for some tips.)
 
- (c) Run a structural topic model (STM) for this corpus, using the `gender` variable in the topic prevalence argument. Use the `stm` function to do this (remember to convert your `dfm` for use with the stm package). Set the `seed` argument to `stm` to be equal to `123`. Be aware, this takes about 15 minutes to run on Jack's laptop -- for testing purposes you might want to set the maximum iterations for the stm to be some low number (`max.em.its = 10` for instance).
+ (c) Run a structural topic model (STM) for this corpus, using the `gender` variable in the topic prevalence argument. Use the `stm` function to do this. Set the `seed` argument to `stm` to be equal to `123`. Be aware, this takes about 15 minutes to run on Jack's laptop -- for testing purposes you might want to set the maximum iterations for the stm to be some low number (`max.em.its = 10` for instance).
 
-    (i) First, convert the `speechDFM` to the `stm` format using Ken's cool `convert` function.
-
-    (ii) Now specify and estimate the `stm` model:
+    (ii) Specify and estimate the `stm` model:
 
     (iii) Use the `plot` function on your estimated `stm` object to see the top topic words with their corpus frequency
 
@@ -65,10 +63,10 @@ First we construct the relevant `dfm` and estimate the `lda` model.
 speechCorpus <- corpus(speeches$speech)
 
 ## Convert to dfm, removing some words that appear very regularly
-speechDfm <- dfm(speechCorpus, remove = c(stopwords(source = "smart"),stopwords("english"), "will", "hon", "right","people","government","can","friend","house","gentleman","said", "interruption", "prime", "minister", "secretary", "state"), stem = F)
+speechDfm <- dfm(speechCorpus, remove = c(stopwords("english"), "will", "hon", "right","people","government","can","friend","house","gentleman","said", "interruption", "prime", "minister", "secretary", "state"), stem = F)
 
 ## Trim some rarely occuring words
-speechDfm <- dfm_trim(speechDfm, min_termfreq = 15, minDoc = .0015 * ndoc(speechDfm))
+speechDfm <- dfm_trim(speechDfm, min_termfreq = 15, min_docfreq = 0.0015, docfreq_type = "prop")
 
 # Convert to lda format
 speechDfmlda <- convert(speechDfm, to = "lda")
