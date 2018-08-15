@@ -7,10 +7,8 @@ You should clone this repository to get started with this lab.  The URL to clone
 * [Rmarkdown](ME314_assignment10.Rmd).
 * [html](ME314_assignment10.html)
 
-<!--
 ### Solutions
  
 Solution to Assignment 9 as:
 *  [html](ME314_assignment10_solution.html) 
 *  [RMarkdown](ME314_assignment10_solution.Rmd)  
---> 
