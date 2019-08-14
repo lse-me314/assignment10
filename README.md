@@ -9,4 +9,6 @@ You should clone this repository to get started with this lab.  The URL to clone
 
 ### Solutions
  
-* Solutions to each assignment will be made available on the next day after each lab.
+Solution to Assignment 10 as:
+*  [RMarkdown](ME314_assignment10_solutions.Rmd)  
+*  [HTML](ME314_assignment10_solutions.html)
