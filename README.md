@@ -6,7 +6,3 @@ You should clone this repository to get started with this lab.  The URL to clone
 
 * [Rmarkdown](ME314_assignment10.Rmd).
 * [html](ME314_assignment10.html)
-
-### Solutions
- 
-* Solutions to each assignment will be made available on the next day after each lab.
