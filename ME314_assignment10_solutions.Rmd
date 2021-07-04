@@ -1,0 +1,204 @@
+---
+title: "Assignment 10 Solutions"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "##"
+)
+```
+
+```{r, echo = FALSE}
+library("quanteda", quietly = TRUE, warn.conflicts = FALSE, verbose = FALSE)
+library(quanteda.corpora)
+```
+
+## Exercise 10.1
+
+In this assignment, you will use R to understand and apply document classification and supervised scaling using R and **quanteda**.
+
+We will start with a classic computer science dataset of movie reviews, [(Pang and Lee 2004)](http://www.cs.cornell.edu/home/llee/papers/cutsent.pdf).
+The movies corpus has an attribute `Sentiment` that labels each text as either `pos` or `neg` according to the original imdb.com archived newspaper review star rating.  We will begin by examining the conditional probabilities at the word level.
+
+```{r}
+set.seed(1234)  # use this just before the command below
+moviesShuffled <- corpus_sample(data_corpus_movies, size = 2000)
+```
+
+a) Make a dfm from the shuffled corpus, and make training labels. In this case, we are using 1500 training labels, and leaving the remaining 500 unlabelled to use as a test set. We will also trim the dataset to remove rare features.
+
+```{r}
+movieDfm <- dfm_trim( dfm(moviesShuffled, verbose = FALSE), min_count = 10)
+trainclass <- factor(c(docvars(moviesShuffled, "Sentiment")[1:1500], rep(NA, 500)))
+table(trainclass, useNA = "ifany")
+```
+
+b) Run the training and testing commands of the Naive Bayes classifier, and compare the predictions for the documents with the actual document labels for the test set using a confusion matrix.
+
+```{r}
+movieNb <- textmodel_nb(movieDfm, trainclass)
+movPreds <- predict(movieNb, newdata = movieDfm[1501:2000])
+(movTable <- table(movPreds, docvars(moviesShuffled, "Sentiment")[1501:2000]))
+```
+
+c) Compute the following statistics for the last classification: 
+    
+Use this code for starters, and note that it returns something that you can use to compute \(F1\).
+
+```{r}
+precrecall <- function(mytable, verbose=TRUE) {
+    truePositives <- mytable[1,1]
+    falsePositives <- sum(mytable[1,]) - truePositives
+    falseNegatives <- sum(mytable[,1]) - truePositives
+    precision <- truePositives / (truePositives + falsePositives)
+    recall <- truePositives / (truePositives + falseNegatives)
+    if (verbose) {
+        print(mytable)
+        cat("\n precision =", round(precision, 2), 
+            "\n    recall =", round(recall, 2), "\n")
+    }
+    invisible(c(precision, recall))
+}
+```
+    
+Hint: Computing precision and recall is not the same if we are considering the "true positive" to be predicting positive for a true positive, versus predicting negative for a true negative.  Since the factors of `Sentiment` are ordered alphabetically, and since the table command puts lower integer codes for factors first, `movtable` by default puts the (1,1) cell as the case of predicting negative reviews as the "true positive", not predicting positive reviews.  To get the positive-postive prediction you will need to reverse index it, e.g. `movTable[2:1, 2:1]`.
+
+1. precision and recall, *for the positive category prediction*;
+        
+```{r}
+pr <- precrecall(movTable[2:1, 2:1])
+```
+
+2.  \(F1\) from the above; and
+        
+```{r}
+2 * prod(pr) / sum(pr)
+```
+
+3. accuracy.
+        
+```{r}
+sum(diag(movTable)) / sum(movTable)
+```
+
+d) Extract the posterior class probabilities of the words `good` and `great`. Do the results confirm your previous finding? Clue: look at the documentation for `textmodel_nb()` for how to extract the posterior class probabilities.
+
+```{r}
+movieNb$PcGw[,c("good", "great")]
+```
+
+## Exercise 10.2
+
+a) Load the movies dataset from `quanteda.corpora` (install from GitHub with the provided code if necessary). Then, shuffle the dataset, and take a random sample of 500 of the movie reviews as your "reference" texts. As reference scores, set the ones that are positive to a reference value of +1, and the negative reviews to a value of -1 
+    
+```{r}
+data(data_corpus_movies, package = "quanteda.corpora")
+set.seed(1234)  # use this just before the command below
+moviesShuffled <- corpus_sample(data_corpus_movies, size = 2000)
+
+# adding category as document-level variable
+docvars(moviesShuffled, "set") <- "reference"
+docvars(moviesShuffled, "set")[501:2000] <- "virgin"
+
+# checking that randomization worked. Here there should be no pattern
+table(docvars(moviesShuffled, "set"), docvars(moviesShuffled, "Sentiment"))
+
+# adding the reference score as another document-level variable
+docvars(moviesShuffled, "refscore") <- 
+    ifelse(docvars(moviesShuffled, "set") == "virgin", NA,
+           ifelse(docvars(moviesShuffled, "Sentiment") == "pos", 1, -1))
+```
+        
+b) Score the remaining movie reviews, and predict their "positive-negative" rating using Wordscores. Remember to first create a document-feature matrix. You may want to stem the features here.
+    
+```{r}
+# create a DFM
+moviesDfm <- dfm(moviesShuffled, stem = TRUE)
+
+# fit the wordscores model
+ws <- textmodel_wordscores(moviesDfm, docvars(moviesShuffled, "refscore"))
+
+# predicting the scale for the other features
+preds <- predict(ws, moviesDfm[docvars(moviesShuffled, "set") == "virgin", ])
+```
+
+c) From the results of b, compare the values using `boxplot()` for the categories of their rater assigned positivity or negativity.  Describe the resulting pattern. Look for examples of positive reviews that are predicted to be negative and vice versa. Why do you think the model failed in those cases?
+
+```{r, fig.width = 3, fig.height = 5}
+# plot the differences
+boxplot(preds ~ docvars(corpus_subset(moviesShuffled, set == "virgin"), "Sentiment"), ylab = "Raw wordscore")
+# looking for errors
+false_negative <- which(preds < -0.05 & docvars(moviesShuffled, "Sentiment")[501:2000]=="pos")
+texts(data_corpus_movies)[sample(false_negative, 2)]
+
+false_positive <- which(preds > 0.05 & docvars(moviesShuffled, "Sentiment")[501:2000]=="neg")
+length(false_positive)
+#texts(data_corpus_movies)[sample(false_positive, 2)] throws an error if false_positive is empty
+```
+
+**The model fails in these cases because the reviews actually contain a lot of words of the opposite class (e.g. one of the "false negative" reviews actually criticizes the entire genre of vampire films, but then goes on to praise this particular movie).**
+
+## Exercise 10.3
+
+In this part of the assignment, you will use R to understand and apply unsupervised document scaling. Use the `data_corpus_irishbudget2010` in **quanteda** for this.
+
+a) Fit a wordfish model of all the documents in this corpus. Apply any required preprocessing steps first. Use the `textplot_scale1d` function to visualize the result. (You may want to use the advanced options of this function to get a better plot than just the default one.) 
+
+What do you learn about what the dimension is capturing? You can use wikipedia to learn about the Irish parties involved in this debate to help you answer this question.
+
+
+```{r}
+irish_dfm <- dfm(data_corpus_irishbudget2010, stem = TRUE, 
+                 remove = stopwords("en"), remove_punct = TRUE)
+wfFit <- textmodel_wordfish(irish_dfm)
+wfFit
+textplot_scale1d(wfFit, groups=docvars(data_corpus_irishbudget2010)$party)
+```
+
+**The model is capturing a government vs opposition dimension rather than a left-right dimension.**
+
+b) Plot the wordfish "Eiffel Tower" plot (as in Figure 2 of Slapin and Proksch 2008), from the wordfish object. You can do this using the `textplot_scale1d` function or (even better) using the more advanced code we used in the lecture.
+
+```{r, fig.width = 5, fig.height = 5}
+textplot_scale1d(wfFit, margin = "features")
+```
+
+c) Plot the log of the length in tokens of each text against the alpha-hat from `wfFit`. What does the relationship indicate?
+
+```{r, fig.width = 5, fig.height = 5}
+plot(x = log(ntoken(irish_dfm)), 
+     y = wfFit$alpha, pch = 19,
+     xlab="log token count for each document",
+     ylab="estimated alpha")
+```
+
+**It shows that the alpha parameter is measuring how much each politician speaks.**
+
+d) Plot the log of the frequency of the top most frequent 1000 words against the same psi-hat values from `wfit`, and describe the relationship.
+
+```{r, fig.width = 5, fig.height = 5}
+# finding top 1,000 words
+top1000 <- topfeatures(irish_dfm, n=1000)
+top1000 <- data.frame(word = names(top1000), 
+                      freq = as.numeric(top1000),
+                    stringsAsFactors = FALSE)
+# extracting the estimated psi parameters
+df <- data.frame(
+  word = wfFit$features,
+  psi_hat = wfFit$psi,
+  stringsAsFactors=FALSE
+)
+df <- merge(df, top1000)
+
+plot(
+  x = jitter(log(df$freq), amount = 0.05),
+  y = df$psi_hat,
+  pch = 19, col = rgb(0, 0, 0, 1/4),
+  xlab = "log(word frequency)",
+  ylab = "estimated psi"
+)
+```
+
+**Psi captures the log frequency with which each word appears in the corpus.**
