@@ -13,29 +13,28 @@ knitr::opts_chunk$set(
 
 ```{r, echo = FALSE, message=FALSE}
 library("quanteda", quietly = TRUE, warn.conflicts = FALSE, verbose = FALSE)
-library(quantedaData)
 library(quanteda.textmodels)
 ```
 
 In this assignment, you will use R to understand and apply document classification and supervised scaling using R and **quanteda**.
 
-## Exercise 10.1 - Naive Bayes Classification of Movie Reviews
+## Exercise 10.1 - Naive Bayes Classification of Movie Revies
 
-We will start with a classic computer science dataset of movie reviews, [(Pang and Lee 2004)](http://www.cs.cornell.edu/home/llee/papers/cutsent.pdf).
-The movies corpus has an attribute `Sentiment` that labels each text as either `pos` or `neg` according to the original imdb.com archived newspaper review star rating.  
+We will start with a classic computer science dataset of movie reviews, [(Pang and Lee 2004)](http://www.cs.cornell.edu/home/llee/papers/cutsent.pdf). The movies corpus has an attribute `sentiment` that labels each text as either `pos` or `neg` according to the original imdb.com archived newspaper review star rating.  
 
-To use this dataset, you will need to install the `quantedaData` package from Ken's github page using the `install_github` function from the `remotes` package: 
-
-```{r, eval=FALSE}
-remotes::install_github("kbenoit/quantedaData")
-library(quantedaData)
-```
-
-You will also need to install the `quanteda.textmodels` package:
+To use this dataset, you will need to install the `quanteda.textmodels` package:
 
 ```{r, eval=FALSE}
 install.packages("quanteda.textmodels")
 library(quanteda.textmodels)
+```
+
+You can extract the relevant corpus object using the following line of code:
+
+```{r}
+
+moviereviews <- quanteda.textmodels::data_corpus_moviereviews
+
 ```
 
 You should also load the `quanteda` package:
@@ -48,11 +47,11 @@ Start by looking at the metadata included with this corpus using the `docvars()`
 
 ```{r, echpo = TRUE}
 
-head(docvars(data_corpus_movies))
+head(docvars(moviereviews))
 
 ```
 
-We will be using the `Sentiment` variable, which includes information from a human-labelling of movie reviews as either positive (`pos`) or negative (`neg`).
+We will be using the `sentiment` variable, which includes information from a human-labelling of movie reviews as either positive (`pos`) or negative (`neg`).
 
 (a) Use the `table()` function to work out how many positive and how many negative movie reviews there are in the corpus.
 
@@ -70,7 +69,7 @@ train <- sample(c(TRUE, FALSE), 2000, replace = TRUE, prob = c(.75, .25))
 
 d) Make a dfm for the training corpus (i.e. `dfm()`), and make some reasonable feature selection decisions to reduce the number of features in the dfm. Then make a dfm for the test corpus, and use the `dfm_match()` function to make sure that it contains the same set of features as the training dfm. See the example in the lecture if you are struggling, or consult the relevant help files.
 
-(e) Use the `textmodel_nb()` function to train the Naive Bayes classifier on the training dfm. You should use the dfm you created for the training corpus as the `x` argument to this function, and the outcome (i.e. `training_dfm$Sentiment`) as the `y` argument.
+(e) Use the `textmodel_nb()` function to train the Naive Bayes classifier on the training dfm. You should use the dfm you created for the training corpus as the `x` argument to this function, and the outcome (i.e. `training_dfm$sentiment`) as the `y` argument.
 
 (f) Examine the `param` element of the fitted model. Which words have the highest probability under the `pos` class? Which words have the highest probability under the `neg` class? You might find the `sort()` function helpful here.
 
