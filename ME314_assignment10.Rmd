@@ -1,5 +1,5 @@
 ---
-title: "Assignment 10 - Text Classification and Scaling"
+title: "Assignment 10 - Similarity Metrics and Supervised Learning for Text"
 author: "Jack Blumenau"
 output: html_document
 ---
@@ -11,23 +11,114 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r, echo = FALSE, message=FALSE}
-library("quanteda", quietly = TRUE, warn.conflicts = FALSE, verbose = FALSE)
+In this assignment, you will use R to calculate similarity metrics for text data, and apply document classification methods using **quanteda**.
+
+You will need the following packages:
+
+```{r, echo = TRUE, message=FALSE}
+library(quanteda)
 library(quanteda.textmodels)
+library(quanteda.textplots)
+library(quanteda.textstats)
+library(tidyverse)
+library(caret)
 ```
 
-In this assignment, you will use R to understand and apply document classification and supervised scaling using R and **quanteda**.
+## Exercise 10.1 - Similarity Metrics for Analyzing the Preambles of Constitutions
 
-## Exercise 10.1 - Naive Bayes Classification of Movie Revies
+Did the United States constitution influence the constitutions of other countries? There is a growing scholarly train of thought that suggests the influence of the US Constitution has decreased over time, as it is increasingly divergent from an increasing global consensus of the importance of human rights to constitutional settlements. However, there is a lack of empirical and systematic knowledge about the extent to which the U.S. Constitution impacts the revision and adoption of formal constitutions across the world.[^seminar3-1]
 
-We will start with a classic computer science dataset of movie reviews, [(Pang and Lee 2004)](http://www.cs.cornell.edu/home/llee/papers/cutsent.pdf). The movies corpus has an attribute `sentiment` that labels each text as either `pos` or `neg` according to the original imdb.com archived newspaper review star rating.  
+[^seminar3-1]: This problem set draws from material in [Quantitative Social Science: An Introduction](https://press.princeton.edu/books/hardcover/9780691167039/quantitative-social-science) by Kosuke Imai.
 
-To use this dataset, you will need to install the `quanteda.textmodels` package:
+[David S. Law and Mila Versteeg (2012)](https://www.nyulawreview.org/wp-content/uploads/2018/08/NYULawReview-87-3-Law-Versteeg_0.pdf) investigate the influence of the US constitution empirically and show that other countries have, in recent decades, become increasingly unlikely to model the rights-related provisions of their own constitutions upon those found in the US Constitution. In this problem set, we will use some of the methods that we covered this week to replicate some parts of their analysis.
 
-```{r, eval=FALSE}
-install.packages("quanteda.textmodels")
-library(quanteda.textmodels)
+We will use the `constitutions.csv` file for this question. 
+
+Once you have downloaded this files and stored it somewhere sensible, you can load it into R using the following command:
+
+```{r, echo = TRUE, eval = TRUE, message=FALSE, warning=FALSE}
+
+constitutions <- read_csv("constitutions.csv")
+
 ```
+
+This file contains the preambles of `r nrow(constitutions)` (English-translated) constitutions. The data contains the following variables:
+
+| Variable    | Description                                |
+|:------------|:-------------------------------------------|
+| `country`   | Name of the country                        |
+| `continent` | Continent of the country                   |
+| `year`      | Year in which the constitution was written |
+| `preamble`  | Text of the preamble of the constitution   |
+
+: Variables in the `constituiton` data.
+
+You can take a quick look at the variables in the data by using the `glimpse()` function from the `tidyverse` package:
+
+```{r, echo = TRUE, eval = TRUE}
+
+glimpse(constitutions)
+
+```
+
+
+
+### Tf-idf
+
+(a) Explore the `constitutions` object to get a sense of the data that we are working with. What is the average length of the texts stored in the `preambles` variable?[^seminar3-2] Which country has the longest preamble text?[^seminar3-3] Which has the shortest?[^seminar3-4] Has the average length of these preambles changed over time?[^seminar3-5]
+
+[^seminar3-2]: The `ntokens()` function will be helpful here.
+
+[^seminar3-3]: The `which.max()` function will be helpful here.
+
+[^seminar3-4]: The `which.min()` function will be helpful here.
+
+[^seminar3-5]: You will need to compare the length of the preambles variable to the `year` variable in some way (a good-looking plot would be nice!)
+
+(b) Convert the `constitutions` data.frame into a `corpus()` object and then into a `dfm()` object (remember that you will need to use the `tokens()`) function as well. Make some sensible feature selection decisions.
+
+
+(c) Use the `topfeatures()` function to find the most prevalent 10 features in the US constitution. Compare these features to the top features for three other countries of your choice. What do you notice?
+
+
+(d) Apply tf-idf weights to your dfm using the `dfm_tfidf()` function. Repeat the exercise above using the new matrix. What do you notice?
+
+(e)  Make two word clouds for two for the USA and one other country using the `textplot_wordcloud()` function. Marvel at how ugly these are.[^seminar3-6]
+
+[^seminar3-6]: You may need to set the `min_count` argument to be a lower value than the default of 3 for the US constitution, as that text is very short.
+
+
+## Cosine Similarity
+
+The cosine similarity ($cos(\theta)$) between two vectors $\textbf{a}$ and $\textbf{b}$ is defined as:
+
+$$cos(\theta) = \frac{\mathbf{a} \cdot \mathbf{b}}{\left|\left| \mathbf{a} \right|\right| \left|\left| \mathbf{b} \right|\right|}$$
+
+where $\theta$ is the angle between the two vectors and $\left| \mathbf{a} \right|$ and $\left| \mathbf{b} \right|$ are the *magnitudes* of the vectors $\mathbf{a}$ and $\mathbf{b}$, respectively. In slightly more laborious, but possibly easier to understand, notation:
+
+$$cos(\theta) =  \frac{a_1b_1 + a_2b_2 + ... + a_Jb_J}{\sqrt{a_1^2 + a_2^2 + ... + a_J^2} \times \sqrt{b_1^2 + b_2^2 + ... + b_J^2}}$$
+
+(f) Use the `textstat_simil()` function to calculate the cosine similarity between the preamble for the US constitution and *all* other preambles in the data.[^seminar3-9] Assign the output of this function to the original `constitutions` data.frame using the `as.numeric()` function. Which 3 constitutions are most similar to the US? Which are the 3 least similar?[^seminar3-10]
+
+[^seminar3-9]: You can also provide this function with an `x` *matrix* and a `y` vector. This will enable you to calculate the similarity between all rows in `x` and the vector used for `y`.
+
+[^seminar3-10]: Use the `order()` function to acheive this. Look back at seminar 2 if you have forgotten how to use this function.
+
+
+(g) Calculate the average cosine similarity between the constitution of the US and the constitutions of other countries for each decade in the data for all constitutions written from the 1950s onwards.
+
+There are a couple of coding nuances that you will need to tackle to complete this question.
+
+-   First, you will need to convert the `year` variable to a `decade` variable. You can do this by using the `%%` "modulo" operator, which calculates the remainder after the division of two numeric variables. For instance, `1986 %% 10` will return a value of `6`. If you subtract that from the original year, you will be left with the correct decade (i.e. `1986 - 6 = 1980`).
+
+-   Second, you will need to calculate the decade-level averages of the cosine similarity variable that you created in answer to the question above. To do so, you should use the `group_by()` and `summarise()` functions.`group_by()` allows you to specify the variable by which the summarisation should be applied, and the `summarise()` function allows you to specify which type of summary you wish to use (i.e. here you should be using the `mean()` function).
+
+(h)  Create a line graph (`geom_line()` in ggplot) with the averages that you calculated above on the y-axis and with the decades on the x-axis. Have constitution preambles become less similar to the preamble of the US constituion over recent history?
+
+
+## Exercise 10.2 - Naive Bayes Classification of Movie Reviews
+
+In this question, we will use Naive Bayes models to predict whether movies are positively or negatively reviewed. We will use a classic computer science dataset of movie reviews, [(Pang and Lee 2004)](http://www.cs.cornell.edu/home/llee/papers/cutsent.pdf). The movies corpus has an attribute `sentiment` that labels each text as either `pos` or `neg` according to the original imdb.com archived newspaper review star rating.  
 
 You can extract the relevant corpus object using the following line of code:
 
@@ -35,12 +126,6 @@ You can extract the relevant corpus object using the following line of code:
 
 moviereviews <- quanteda.textmodels::data_corpus_moviereviews
 
-```
-
-You should also load the `quanteda` package:
-
-```{r, eval=FALSE}
-library(quanteda)
 ```
 
 Start by looking at the metadata included with this corpus using the `docvars()` function:
@@ -55,7 +140,9 @@ We will be using the `sentiment` variable, which includes information from a hum
 
 (a) Use the `table()` function to work out how many positive and how many negative movie reviews there are in the corpus.
 
-(b) Use the code below to create a logical vector of the same length as the number of documents in the corpus. We will use this vector to define our training and test sets. Look at `?sample` to make sure you understand what each part of the code is doing. As we are using randomness to generate this vector, don't forget to first set your seed so that the results are fully replicable!
+b) Make a dfm for this corpus (i.e. `dfm()`), and make some reasonable feature selection decisions to reduce the number of features in the dfm. You will need to first convert the `moviereviews` corpus into a tokens object, using `tokens()`.
+
+(c) Use the code below to create a logical vector of the same length as the number of documents in the corpus. We will use this vector to define our training and test sets. Look at `?sample` to make sure you understand what each part of the code is doing. As we are using randomness to generate this vector, don't forget to first set your seed so that the results are fully replicable!
 
 ```{r}
 
@@ -65,9 +152,8 @@ train <- sample(c(TRUE, FALSE), 2000, replace = TRUE, prob = c(.75, .25))
 
 ```
 
-(c) Subset the corpus into a training set and a test set using the vector you just created. Use the square brackets to subset (i.e. `my_corpus[vector,]`) to do this. (Remember, if we use an exclamation point `!` before a logical vector, it will reverse the `TRUE` and `FALSE` values.)
+(d) Subset the dfm into a training set and a test set using the vector you just created. Use the `dfm_subset()` function to acheive this.
 
-d) Make a dfm for the training corpus (i.e. `dfm()`), and make some reasonable feature selection decisions to reduce the number of features in the dfm. Then make a dfm for the test corpus, and use the `dfm_match()` function to make sure that it contains the same set of features as the training dfm. See the example in the lecture if you are struggling, or consult the relevant help files.
 
 (e) Use the `textmodel_nb()` function to train the Naive Bayes classifier on the training dfm. You should use the dfm you created for the training corpus as the `x` argument to this function, and the outcome (i.e. `training_dfm$sentiment`) as the `y` argument.
 
@@ -75,36 +161,5 @@ d) Make a dfm for the training corpus (i.e. `dfm()`), and make some reasonable f
 
 (g) Use the `predict()` function to predict the sentiment of movies in the test set dfm. The predict function takes two arguments in this instance: 1) the estimated Naive Bayes model from part (e), and 2) the test-set dfm. Create a confusion matrix of the predicted classes and the actual classes in the test data. What is the accuracy of your model?
 
-(h) Load the `caret` package (install it first using `install.packages()` if you need to), and then use the `confusionMatrix()` function to calculate other statistics relevant to the predictive performance of your model. The first argument to the `confusionMatrix()` function should be the confusion matrix that you created in answer to question (g). You should also set the `positive` argument equal to `"pos"` to tell R the level of the outcome that corresponds to a "positive" result. Report the the accuracy, sensitivity and specificity of your predictions, giving a brief interpretation of each.
+(h) Use the `confusionMatrix()` function to calculate other statistics relevant to the predictive performance of your model. The first argument to the `confusionMatrix()` function should be the confusion matrix that you created in answer to question (g). You should also set the `positive` argument equal to `"pos"` to tell R the level of the outcome that corresponds to a "positive" result. Report the the accuracy, sensitivity and specificity of your predictions, giving a brief interpretation of each.
 
-## Exercise 10.2 - Wordscores for Movie Reviews
-
-(a) We will now use the same training and test set to estimate wordscores for the movie reviews. First, create a new variable (named `refscore`) for the training set dfm which is equal to 1 for positive movie reviews, and -1 for negative movie reviews. These are the reference scores that we will use for training the model.
-
-(b) Use the `textmodel_wordscores()` function to estimate wordscores on the training dfm. This function requires two arguments: 1) `x`, for the dfm you are using to estimate the model, and 2) `y` for the vector of reference scores associated with each training document (i.e. the variable you created in the answer above).
-
-(c) Predict the wordscores for the test set using the predict function. Again, for `predict()` to work, you need to pass it the trained wordscores model, and the test set dfm. Save your predictions as a new metadata variable in your training data dfm.
-
-(d) Use the `docvars()` function on your test set dfm to check that you have correctly assigned the predictions as meta data (hint: if you have done (c) correctly, then when you run `str(docvars(my_test_set_dfm))` you should see a column containing the estimated wordscores).
-
-(e) Use the `boxplot()` function to compare the distribution of wordscores against the "true" sentiment of the reviews given by human annotators (look at `?boxplot` to see how to create the plot). Describe the resulting pattern. 
-
-(f) Look for examples of texts with positive wordscores (for instance, any text with a wordscore greater than 0.075) that are nonetheless categorised as "negative" by human readers. Look for examples of texts with negative wordscores (for instance, any text with a wordscore smaller than -0.03) that are nonetheless categorised as "positive" by human readers. Why do you think the model gave the wrong predictions in those cases? 
-
-    Hint: you may want to use logical relations to find the texts you are looking for. For instance, using `my_vetor > 0.05` will return a logical vector which is equal to `TRUE` when `my_vector` is greater than 0.05 and `FALSE` otherwise. Similarly, `my_vector == "a string I want"` will return a logical vector which is equal to `TRUE` when `my_vector` is equal to "a string I want" and `FALSE` otherwise.
-
-    Hint 2: You can extract the full texts from your corpus object by using `as.character(my_corpus)` with the appropriate subsetting operator (i.e. `[,]`).
-
-## Exercise 10.3 - Wordfish for Irish Parliamentary Debates (Hard question)
-
-In this part of the assignment, you will use R to understand and apply unsupervised document scaling. Use the `data_corpus_irishbudget2010` in **quanteda.textmodels** for this. You will also need to load (and possible install) the `quanteda.textplots` package first.
-
-a) Fit a wordfish model of all the documents in this corpus. Apply any required preprocessing steps first. Use the `textplot_scale1d` function to visualize the result. (You may want to use the advanced options of this function to get a better plot than just the default one.) 
-
-    What do you learn about what the dimension is capturing? You can use wikipedia to learn about the Irish parties involved in this debate to help you answer this question.
-
-b) Plot the wordfish "Eiffel Tower" plot (as in Figure 2 of Slapin and Proksch 2008), from the wordfish object. You can do this using the `textplot_scale1d` function. What is your interpretation of these results?
-
-c) Plot the log of the length in tokens of each text against the $\hat{\alpha}$ from your estimated wordfish model. What does the relationship indicate? (Hint: you can use the `ntoken()` function on your dfm to extract the number of words in each text.)
-
-d) Plot the log of the frequency of the top most frequent 1000 words against the same psi-hat values from your estimated wordfish model, and describe the relationship. The `topfeatures()` function might be helpful here.

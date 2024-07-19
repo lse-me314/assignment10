@@ -12,7 +12,7 @@
 <meta name="author" content="Jack Blumenau" />
 
 
-<title>Assignment 10 - Text Classification and Scaling</title>
+<title>Assignment 10 - Similarity Metrics and Supervised Learning for Text</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -298,23 +298,17 @@ overflow-y: auto;
 border: 1px solid #ddd;
 border-radius: 4px;
 }
-.tabset-dropdown > .nav-tabs > li.active:before {
-content: "";
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+content: "\e259";
 font-family: 'Glyphicons Halflings';
 display: inline-block;
 padding: 10px;
 border-right: 1px solid #ddd;
 }
 .tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
-content: "";
-border: none;
-}
-.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
-content: "";
+content: "\e258";
 font-family: 'Glyphicons Halflings';
-display: inline-block;
-padding: 10px;
-border-right: 1px solid #ddd;
+border: none;
 }
 .tabset-dropdown > .nav-tabs > li.active {
 display: block;
@@ -355,34 +349,181 @@ display: none;
 
 
 
-<h1 class="title toc-ignore">Assignment 10 - Text Classification and
-Scaling</h1>
+<h1 class="title toc-ignore">Assignment 10 - Similarity Metrics and
+Supervised Learning for Text</h1>
 <h4 class="author">Jack Blumenau</h4>
 
 </div>
 
 
-<p>In this assignment, you will use R to understand and apply document
-classification and supervised scaling using R and
+<p>In this assignment, you will use R to calculate similarity metrics
+for text data, and apply document classification methods using
 <strong>quanteda</strong>.</p>
-<div id="exercise-10.1---naive-bayes-classification-of-movie-revies" class="section level2">
-<h2>Exercise 10.1 - Naive Bayes Classification of Movie Revies</h2>
-<p>We will start with a classic computer science dataset of movie
-reviews, <a href="http://www.cs.cornell.edu/home/llee/papers/cutsent.pdf">(Pang and
+<p>You will need the following packages:</p>
+<pre class="r"><code>library(quanteda)
+library(quanteda.textmodels)
+library(quanteda.textplots)
+library(quanteda.textstats)
+library(tidyverse)
+library(caret)</code></pre>
+<div id="exercise-10.1---similarity-metrics-for-analyzing-the-preambles-of-constitutions" class="section level2">
+<h2>Exercise 10.1 - Similarity Metrics for Analyzing the Preambles of
+Constitutions</h2>
+<p>Did the United States constitution influence the constitutions of
+other countries? There is a growing scholarly train of thought that
+suggests the influence of the US Constitution has decreased over time,
+as it is increasingly divergent from an increasing global consensus of
+the importance of human rights to constitutional settlements. However,
+there is a lack of empirical and systematic knowledge about the extent
+to which the U.S. Constitution impacts the revision and adoption of
+formal constitutions across the world.<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a></p>
+<p><a href="https://www.nyulawreview.org/wp-content/uploads/2018/08/NYULawReview-87-3-Law-Versteeg_0.pdf">David
+S. Law and Mila Versteeg (2012)</a> investigate the influence of the US
+constitution empirically and show that other countries have, in recent
+decades, become increasingly unlikely to model the rights-related
+provisions of their own constitutions upon those found in the US
+Constitution. In this problem set, we will use some of the methods that
+we covered this week to replicate some parts of their analysis.</p>
+<p>We will use the <code>constitutions.csv</code> file for this
+question.</p>
+<p>Once you have downloaded this files and stored it somewhere sensible,
+you can load it into R using the following command:</p>
+<pre class="r"><code>
+constitutions &lt;- read_csv(&quot;constitutions.csv&quot;)</code></pre>
+<p>This file contains the preambles of 155 (English-translated)
+constitutions. The data contains the following variables:</p>
+<table>
+<caption>Variables in the <code>constituiton</code> data.</caption>
+<thead>
+<tr class="header">
+<th align="left">Variable</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left"><code>country</code></td>
+<td align="left">Name of the country</td>
+</tr>
+<tr class="even">
+<td align="left"><code>continent</code></td>
+<td align="left">Continent of the country</td>
+</tr>
+<tr class="odd">
+<td align="left"><code>year</code></td>
+<td align="left">Year in which the constitution was written</td>
+</tr>
+<tr class="even">
+<td align="left"><code>preamble</code></td>
+<td align="left">Text of the preamble of the constitution</td>
+</tr>
+</tbody>
+</table>
+<p>You can take a quick look at the variables in the data by using the
+<code>glimpse()</code> function from the <code>tidyverse</code>
+package:</p>
+<pre class="r"><code>
+glimpse(constitutions)
+## Rows: 155
+## Columns: 4
+## $ country   &lt;chr&gt; &quot;afghanistan&quot;, &quot;albania&quot;, &quot;algeria&quot;, &quot;andorra&quot;, &quot;angola&quot;, &quot;a…
+## $ continent &lt;chr&gt; &quot;Asia&quot;, &quot;Europe&quot;, &quot;Africa&quot;, &quot;Europe&quot;, &quot;Africa&quot;, &quot;Americas&quot;, …
+## $ year      &lt;dbl&gt; 2004, 1998, 1989, 1993, 2010, 1981, 1853, 1995, 1995, 1973, …
+## $ preamble  &lt;chr&gt; &quot;In the name of Allah, the Most Beneficent, the Most Mercifu…</code></pre>
+<div id="tf-idf" class="section level3">
+<h3>Tf-idf</h3>
+<ol style="list-style-type: lower-alpha">
+<li>Explore the <code>constitutions</code> object to get a sense of the
+data that we are working with. What is the average length of the texts
+stored in the <code>preambles</code> variable?<a href="#fn2" class="footnote-ref" id="fnref2"><sup>2</sup></a> Which country has the
+longest preamble text?<a href="#fn3" class="footnote-ref" id="fnref3"><sup>3</sup></a> Which has the shortest?<a href="#fn4" class="footnote-ref" id="fnref4"><sup>4</sup></a> Has the average length
+of these preambles changed over time?<a href="#fn5" class="footnote-ref" id="fnref5"><sup>5</sup></a></li>
+</ol>
+<ol start="2" style="list-style-type: lower-alpha">
+<li><p>Convert the <code>constitutions</code> data.frame into a
+<code>corpus()</code> object and then into a <code>dfm()</code> object
+(remember that you will need to use the <code>tokens()</code>) function
+as well. Make some sensible feature selection decisions.</p></li>
+<li><p>Use the <code>topfeatures()</code> function to find the most
+prevalent 10 features in the US constitution. Compare these features to
+the top features for three other countries of your choice. What do you
+notice?</p></li>
+<li><p>Apply tf-idf weights to your dfm using the
+<code>dfm_tfidf()</code> function. Repeat the exercise above using the
+new matrix. What do you notice?</p></li>
+<li><p>Make two word clouds for two for the USA and one other country
+using the <code>textplot_wordcloud()</code> function. Marvel at how ugly
+these are.<a href="#fn6" class="footnote-ref" id="fnref6"><sup>6</sup></a></p></li>
+</ol>
+</div>
+</div>
+<div id="cosine-similarity" class="section level2">
+<h2>Cosine Similarity</h2>
+<p>The cosine similarity (<span class="math inline">\(cos(\theta)\)</span>) between two vectors <span class="math inline">\(\textbf{a}\)</span> and <span class="math inline">\(\textbf{b}\)</span> is defined as:</p>
+<p><span class="math display">\[cos(\theta) = \frac{\mathbf{a} \cdot
+\mathbf{b}}{\left|\left| \mathbf{a} \right|\right| \left|\left|
+\mathbf{b} \right|\right|}\]</span></p>
+<p>where <span class="math inline">\(\theta\)</span> is the angle
+between the two vectors and <span class="math inline">\(\left|
+\mathbf{a} \right|\)</span> and <span class="math inline">\(\left|
+\mathbf{b} \right|\)</span> are the <em>magnitudes</em> of the vectors
+<span class="math inline">\(\mathbf{a}\)</span> and <span class="math inline">\(\mathbf{b}\)</span>, respectively. In slightly
+more laborious, but possibly easier to understand, notation:</p>
+<p><span class="math display">\[cos(\theta) =  \frac{a_1b_1 + a_2b_2 +
+... + a_Jb_J}{\sqrt{a_1^2 + a_2^2 + ... + a_J^2} \times \sqrt{b_1^2 +
+b_2^2 + ... + b_J^2}}\]</span></p>
+<ol start="6" style="list-style-type: lower-alpha">
+<li>Use the <code>textstat_simil()</code> function to calculate the
+cosine similarity between the preamble for the US constitution and
+<em>all</em> other preambles in the data.<a href="#fn7" class="footnote-ref" id="fnref7"><sup>7</sup></a> Assign the output of
+this function to the original <code>constitutions</code> data.frame
+using the <code>as.numeric()</code> function. Which 3 constitutions are
+most similar to the US? Which are the 3 least similar?<a href="#fn8" class="footnote-ref" id="fnref8"><sup>8</sup></a></li>
+</ol>
+<ol start="7" style="list-style-type: lower-alpha">
+<li>Calculate the average cosine similarity between the constitution of
+the US and the constitutions of other countries for each decade in the
+data for all constitutions written from the 1950s onwards.</li>
+</ol>
+<p>There are a couple of coding nuances that you will need to tackle to
+complete this question.</p>
+<ul>
+<li><p>First, you will need to convert the <code>year</code> variable to
+a <code>decade</code> variable. You can do this by using the
+<code>%%</code> “modulo” operator, which calculates the remainder after
+the division of two numeric variables. For instance,
+<code>1986 %% 10</code> will return a value of <code>6</code>. If you
+subtract that from the original year, you will be left with the correct
+decade (i.e. <code>1986 - 6 = 1980</code>).</p></li>
+<li><p>Second, you will need to calculate the decade-level averages of
+the cosine similarity variable that you created in answer to the
+question above. To do so, you should use the <code>group_by()</code> and
+<code>summarise()</code> functions.<code>group_by()</code> allows you to
+specify the variable by which the summarisation should be applied, and
+the <code>summarise()</code> function allows you to specify which type
+of summary you wish to use (i.e. here you should be using the
+<code>mean()</code> function).</p></li>
+</ul>
+<ol start="8" style="list-style-type: lower-alpha">
+<li>Create a line graph (<code>geom_line()</code> in ggplot) with the
+averages that you calculated above on the y-axis and with the decades on
+the x-axis. Have constitution preambles become less similar to the
+preamble of the US constituion over recent history?</li>
+</ol>
+</div>
+<div id="exercise-10.2---naive-bayes-classification-of-movie-reviews" class="section level2">
+<h2>Exercise 10.2 - Naive Bayes Classification of Movie Reviews</h2>
+<p>In this question, we will use Naive Bayes models to predict whether
+movies are positively or negatively reviewed. We will use a classic
+computer science dataset of movie reviews, <a href="http://www.cs.cornell.edu/home/llee/papers/cutsent.pdf">(Pang and
 Lee 2004)</a>. The movies corpus has an attribute <code>sentiment</code>
 that labels each text as either <code>pos</code> or <code>neg</code>
 according to the original imdb.com archived newspaper review star
 rating.</p>
-<p>To use this dataset, you will need to install the
-<code>quanteda.textmodels</code> package:</p>
-<pre class="r"><code>install.packages(&quot;quanteda.textmodels&quot;)
-library(quanteda.textmodels)</code></pre>
 <p>You can extract the relevant corpus object using the following line
 of code:</p>
 <pre class="r"><code>
 moviereviews &lt;- quanteda.textmodels::data_corpus_moviereviews</code></pre>
-<p>You should also load the <code>quanteda</code> package:</p>
-<pre class="r"><code>library(quanteda)</code></pre>
 <p>Start by looking at the metadata included with this corpus using the
 <code>docvars()</code> function:</p>
 <pre class="r"><code>
@@ -398,36 +539,31 @@ head(docvars(moviereviews))
 information from a human-labelling of movie reviews as either positive
 (<code>pos</code>) or negative (<code>neg</code>).</p>
 <ol style="list-style-type: lower-alpha">
-<li><p>Use the <code>table()</code> function to work out how many
-positive and how many negative movie reviews there are in the
-corpus.</p></li>
-<li><p>Use the code below to create a logical vector of the same length
-as the number of documents in the corpus. We will use this vector to
-define our training and test sets. Look at <code>?sample</code> to make
-sure you understand what each part of the code is doing. As we are using
+<li>Use the <code>table()</code> function to work out how many positive
+and how many negative movie reviews there are in the corpus.</li>
+</ol>
+<ol start="2" style="list-style-type: lower-alpha">
+<li>Make a dfm for this corpus (i.e. <code>dfm()</code>), and make some
+reasonable feature selection decisions to reduce the number of features
+in the dfm. You will need to first convert the <code>moviereviews</code>
+corpus into a tokens object, using <code>tokens()</code>.</li>
+</ol>
+<ol start="3" style="list-style-type: lower-alpha">
+<li>Use the code below to create a logical vector of the same length as
+the number of documents in the corpus. We will use this vector to define
+our training and test sets. Look at <code>?sample</code> to make sure
+you understand what each part of the code is doing. As we are using
 randomness to generate this vector, don’t forget to first set your seed
-so that the results are fully replicable!</p></li>
+so that the results are fully replicable!</li>
 </ol>
 <pre class="r"><code>
 set.seed(1234)
 
 train &lt;- sample(c(TRUE, FALSE), 2000, replace = TRUE, prob = c(.75, .25))</code></pre>
-<ol start="3" style="list-style-type: lower-alpha">
-<li>Subset the corpus into a training set and a test set using the
-vector you just created. Use the square brackets to subset
-(i.e. <code>my_corpus[vector,]</code>) to do this. (Remember, if we use
-an exclamation point <code>!</code> before a logical vector, it will
-reverse the <code>TRUE</code> and <code>FALSE</code> values.)</li>
-</ol>
 <ol start="4" style="list-style-type: lower-alpha">
-<li>Make a dfm for the training corpus (i.e. <code>dfm()</code>), and
-make some reasonable feature selection decisions to reduce the number of
-features in the dfm. Then make a dfm for the test corpus, and use the
-<code>dfm_match()</code> function to make sure that it contains the same
-set of features as the training dfm. See the example in the lecture if
-you are struggling, or consult the relevant help files.</li>
-</ol>
-<ol start="5" style="list-style-type: lower-alpha">
+<li><p>Subset the dfm into a training set and a test set using the
+vector you just created. Use the <code>dfm_subset()</code> function to
+acheive this.</p></li>
 <li><p>Use the <code>textmodel_nb()</code> function to train the Naive
 Bayes classifier on the training dfm. You should use the dfm you created
 for the training corpus as the <code>x</code> argument to this function,
@@ -444,97 +580,40 @@ in this instance: 1) the estimated Naive Bayes model from part (e), and
 2) the test-set dfm. Create a confusion matrix of the predicted classes
 and the actual classes in the test data. What is the accuracy of your
 model?</p></li>
-<li><p>Load the <code>caret</code> package (install it first using
-<code>install.packages()</code> if you need to), and then use the
-<code>confusionMatrix()</code> function to calculate other statistics
-relevant to the predictive performance of your model. The first argument
-to the <code>confusionMatrix()</code> function should be the confusion
-matrix that you created in answer to question (g). You should also set
-the <code>positive</code> argument equal to <code>&quot;pos&quot;</code> to tell R
-the level of the outcome that corresponds to a “positive” result. Report
-the the accuracy, sensitivity and specificity of your predictions,
-giving a brief interpretation of each.</p></li>
+<li><p>Use the <code>confusionMatrix()</code> function to calculate
+other statistics relevant to the predictive performance of your model.
+The first argument to the <code>confusionMatrix()</code> function should
+be the confusion matrix that you created in answer to question (g). You
+should also set the <code>positive</code> argument equal to
+<code>&quot;pos&quot;</code> to tell R the level of the outcome that corresponds
+to a “positive” result. Report the the accuracy, sensitivity and
+specificity of your predictions, giving a brief interpretation of
+each.</p></li>
 </ol>
 </div>
-<div id="exercise-10.2---wordscores-for-movie-reviews" class="section level2">
-<h2>Exercise 10.2 - Wordscores for Movie Reviews</h2>
-<ol style="list-style-type: lower-alpha">
-<li><p>We will now use the same training and test set to estimate
-wordscores for the movie reviews. First, create a new variable (named
-<code>refscore</code>) for the training set dfm which is equal to 1 for
-positive movie reviews, and -1 for negative movie reviews. These are the
-reference scores that we will use for training the model.</p></li>
-<li><p>Use the <code>textmodel_wordscores()</code> function to estimate
-wordscores on the training dfm. This function requires two arguments: 1)
-<code>x</code>, for the dfm you are using to estimate the model, and 2)
-<code>y</code> for the vector of reference scores associated with each
-training document (i.e. the variable you created in the answer
-above).</p></li>
-<li><p>Predict the wordscores for the test set using the predict
-function. Again, for <code>predict()</code> to work, you need to pass it
-the trained wordscores model, and the test set dfm. Save your
-predictions as a new metadata variable in your training data
-dfm.</p></li>
-<li><p>Use the <code>docvars()</code> function on your test set dfm to
-check that you have correctly assigned the predictions as meta data
-(hint: if you have done (c) correctly, then when you run
-<code>str(docvars(my_test_set_dfm))</code> you should see a column
-containing the estimated wordscores).</p></li>
-<li><p>Use the <code>boxplot()</code> function to compare the
-distribution of wordscores against the “true” sentiment of the reviews
-given by human annotators (look at <code>?boxplot</code> to see how to
-create the plot). Describe the resulting pattern.</p></li>
-<li><p>Look for examples of texts with positive wordscores (for
-instance, any text with a wordscore greater than 0.075) that are
-nonetheless categorised as “negative” by human readers. Look for
-examples of texts with negative wordscores (for instance, any text with
-a wordscore smaller than -0.03) that are nonetheless categorised as
-“positive” by human readers. Why do you think the model gave the wrong
-predictions in those cases?</p>
-<p>Hint: you may want to use logical relations to find the texts you are
-looking for. For instance, using <code>my_vetor &gt; 0.05</code> will
-return a logical vector which is equal to <code>TRUE</code> when
-<code>my_vector</code> is greater than 0.05 and <code>FALSE</code>
-otherwise. Similarly, <code>my_vector == &quot;a string I want&quot;</code> will
-return a logical vector which is equal to <code>TRUE</code> when
-<code>my_vector</code> is equal to “a string I want” and
-<code>FALSE</code> otherwise.</p>
-<p>Hint 2: You can extract the full texts from your corpus object by
-using <code>as.character(my_corpus)</code> with the appropriate
-subsetting operator (i.e. <code>[,]</code>).</p></li>
-</ol>
-</div>
-<div id="exercise-10.3---wordfish-for-irish-parliamentary-debates-hard-question" class="section level2">
-<h2>Exercise 10.3 - Wordfish for Irish Parliamentary Debates (Hard
-question)</h2>
-<p>In this part of the assignment, you will use R to understand and
-apply unsupervised document scaling. Use the
-<code>data_corpus_irishbudget2010</code> in
-<strong>quanteda.textmodels</strong> for this. You will also need to
-load (and possible install) the <code>quanteda.textplots</code> package
-first.</p>
-<ol style="list-style-type: lower-alpha">
-<li><p>Fit a wordfish model of all the documents in this corpus. Apply
-any required preprocessing steps first. Use the
-<code>textplot_scale1d</code> function to visualize the result. (You may
-want to use the advanced options of this function to get a better plot
-than just the default one.)</p>
-<p>What do you learn about what the dimension is capturing? You can use
-wikipedia to learn about the Irish parties involved in this debate to
-help you answer this question.</p></li>
-<li><p>Plot the wordfish “Eiffel Tower” plot (as in Figure 2 of Slapin
-and Proksch 2008), from the wordfish object. You can do this using the
-<code>textplot_scale1d</code> function. What is your interpretation of
-these results?</p></li>
-<li><p>Plot the log of the length in tokens of each text against the
-<span class="math inline">\(\hat{\alpha}\)</span> from your estimated
-wordfish model. What does the relationship indicate? (Hint: you can use
-the <code>ntoken()</code> function on your dfm to extract the number of
-words in each text.)</p></li>
-<li><p>Plot the log of the frequency of the top most frequent 1000 words
-against the same psi-hat values from your estimated wordfish model, and
-describe the relationship. The <code>topfeatures()</code> function might
-be helpful here.</p></li>
+<div class="footnotes footnotes-end-of-document">
+<hr />
+<ol>
+<li id="fn1"><p>This problem set draws from material in <a href="https://press.princeton.edu/books/hardcover/9780691167039/quantitative-social-science">Quantitative
+Social Science: An Introduction</a> by Kosuke Imai.<a href="#fnref1" class="footnote-back">↩︎</a></p></li>
+<li id="fn2"><p>The <code>ntokens()</code> function will be helpful
+here.<a href="#fnref2" class="footnote-back">↩︎</a></p></li>
+<li id="fn3"><p>The <code>which.max()</code> function will be helpful
+here.<a href="#fnref3" class="footnote-back">↩︎</a></p></li>
+<li id="fn4"><p>The <code>which.min()</code> function will be helpful
+here.<a href="#fnref4" class="footnote-back">↩︎</a></p></li>
+<li id="fn5"><p>You will need to compare the length of the preambles
+variable to the <code>year</code> variable in some way (a good-looking
+plot would be nice!)<a href="#fnref5" class="footnote-back">↩︎</a></p></li>
+<li id="fn6"><p>You may need to set the <code>min_count</code> argument
+to be a lower value than the default of 3 for the US constitution, as
+that text is very short.<a href="#fnref6" class="footnote-back">↩︎</a></p></li>
+<li id="fn7"><p>You can also provide this function with an
+<code>x</code> <em>matrix</em> and a <code>y</code> vector. This will
+enable you to calculate the similarity between all rows in
+<code>x</code> and the vector used for <code>y</code>.<a href="#fnref7" class="footnote-back">↩︎</a></p></li>
+<li id="fn8"><p>Use the <code>order()</code> function to acheive this.
+Look back at seminar 2 if you have forgotten how to use this function.<a href="#fnref8" class="footnote-back">↩︎</a></p></li>
 </ol>
 </div>
 
